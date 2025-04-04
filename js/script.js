@@ -1,231 +1,156 @@
-let allData = [];
-let xVar = 'temperature', yVar = 'precipitation', sizeVar = 'windSpeed', targetMonth = 1, targetDay=1, stateVar='GU';
-let xScale, yScale, sizeScale;
+let censusData = [];
+let selectedMetroArea = 'All';
 
-const margin = { top: 80, right: 60, bottom: 60, left: 100 };
-const width = 800 - margin.left - margin.right;
-const height = 600 - margin.top - margin.bottom;
+const whiteHatMargin = { top: 20, right: 30, bottom: 50, left: 70 };
+const whiteHatWidth = 800 - whiteHatMargin.left - whiteHatMargin.right;
+const whiteHatHeight = 600 - whiteHatMargin.top - whiteHatMargin.bottom;
 
-const options = ['temperature', 'windDirection', 'precipitation', 'windSpeed'];
+let whiteHatSvg = d3.select('#white-hat svg')
+    .attr('width', whiteHatWidth + whiteHatMargin.left + whiteHatMargin.right)
+    .attr('height', whiteHatHeight + whiteHatMargin.top + whiteHatMargin.bottom);
 
-const t = 1000; // Transition duration
+let whiteHatG = whiteHatSvg.append('g')
+    .attr('transform', `translate(${whiteHatMargin.left},${whiteHatMargin.top})`);
 
-// Create SVG
-const svg = d3.select('#vis')
-    .append('svg')
-    .attr('width', width + margin.left + margin.right)
-    .attr('height', height + margin.top + margin.bottom)
-    .append('g')
-    .attr('transform', `translate(${margin.left},${margin.top})`);
+let xScaleWhiteHat, yScaleWhiteHat;
 
-function init() {
-    d3.csv('data/weather.csv', function(d) {
+// Define a color scale for metro areas
+let colorScale;
+
+function initWhiteHat() {
+    d3.csv('data/census_tracts.csv', d => {
         return {
-            date: +d.date,
-            year: +(d.date.substring(0, 4)),
-            month: +(d.date.substring(4, 6)),
-            day: +(d.date.substring(6)),
-            temperature: +d.TAVG,
-            windDirection: +d.WDF5,
-            windSpeed: +d.AWND,
-            precipitation: +d.PRCP,
-            station: d.station,
-            state: d.state
+            geoid: d.geoid,
+            metro_area: d.metro_area,
+            median_income: +d.median_income,
+            median_home_value: +d.median_home_value
         };
-    })
-    .then(data => {
-        allData = data;
-        console.log(allData);
-        setupSelector();
-        updateAxes();
-        updateVis();
-    })
-    .catch(error => console.error('Error loading data:', error));
-}
+    }).then(data => {
+        censusData = data;
 
-window.addEventListener('load', init);
+        // Create color scale for metro areas
+        const metroAreas = Array.from(new Set(censusData.map(d => d.metro_area)));
+        metroAreas.sort();
 
-function setupSelector() {
-    var slider = d3
-        .sliderHorizontal()
-        .min(d3.min(allData.map(d => d.month))) // setup the range
-        .max(d3.max(allData.map(d => d.month))+1) // setup the range
-        .step(1) // 1 day step
-        .width(width)
-        .displayValue(false)
-        .on('onchange', (val) => {
-            console.log(val);
-            targetMonth = val; // Update the date
-            updateVis(); // Refresh the chart
-        });
-    
-    d3.select('#slider')
-        .append('svg')
-        .attr('width', width)
-        .attr('height', 100)
-        .append('g')
-        .attr('transform', 'translate(30,30)')
-        .call(slider);
+        colorScale = d3.scaleOrdinal()
+            .domain(metroAreas)
+            .range(d3.schemeCategory10); // or use another color scale like d3.schemeSet3
 
-    var daySlider = d3
-    .sliderHorizontal()
-    .min(d3.min(allData.map(d => d.day))) // setup the range
-    .max(d3.max(allData.map(d => d.day))) // setup the range
-    .step(1) // 1 day step
-    .width(width)
-    .displayValue(false)
-    .on('onchange', (val) => {
-        console.log(val);
-        targetDay = val; // Update the date
-        updateVis(); // Refresh the chart
+        setupSelectorWhiteHat();
+        updateAxesWhiteHat();
+        updateVisWhiteHat();
     });
-    
-    d3.select('#daySlider')
-        .append('svg')
-        .attr('width', width)
-        .attr('height', 100)
-        .append('g')
-        .attr('transform', 'translate(30,30)')
-        .call(daySlider);
-    
-    d3.selectAll('.variable')
-        .each(function() {
-            d3.select(this).selectAll('myOptions')
-                .data(options)
-                .enter()
-                .append('option')
-                .text(d => d)
-                .attr("value", d => d);
-        })
-        .on("change", function(event) {
-            const selectedId = d3.select(this).property("id");
-            const selectedValue = d3.select(this).property("value");
-
-            if (selectedId === "xVariable") {
-                xVar = selectedValue;
-            } else if (selectedId === "yVariable") {
-                yVar = selectedValue;
-            } else if (selectedId === "sizeVariable") {
-                sizeVar = selectedValue;
-            }
-
-            updateAxes();
-            updateVis();
-        });
-        d3.select('#xVariable').property('value', xVar)
-        d3.select('#yVariable').property('value', yVar)
-        d3.select('#sizeVariable').property('value',sizeVar)
-
-        const stateSet = new Set(allData.map(d => d.state));
-        d3.select('#stateVariable')
-            .selectAll('myOptions')
-            .data(stateSet)
-            .enter()
-            .append('option')
-            .text(d => d)
-            .attr("value", d => d);
-        d3.select('#stateVariable').on("change", function() {
-            const selectedState = d3.select(this).property("value");
-            stateVar=selectedState
-            updateAxes();
-            updateVis();
-        })
-        d3.select('#stateVariable').property('value', stateVar);
-    }
-
-function updateAxes() {
-    svg.selectAll('.axis').remove();
-    svg.selectAll('.labels').remove();
-
-    xScale = d3.scaleLinear()
-        .domain([d3.min(allData, d => d[xVar]), d3.max(allData, d => d[xVar])])
-        .range([0, width]);
-    const xAxis = d3.axisBottom(xScale);
-
-    svg.append("g")
-        .attr("class", "axis")
-        .attr("transform", `translate(0,${height})`)
-        .call(xAxis);
-
-    yScale = d3.scaleLinear()
-        .domain([d3.min(allData, d => d[yVar]), d3.max(allData, d => d[yVar])])
-        .range([height, 0]);
-
-    const yAxis = d3.axisLeft(yScale);
-    
-    svg.append('g')
-        .attr('class', 'axis')
-        .attr('transform', `translate(0, 0)`)
-        .call(yAxis);
-
-    sizeScale = d3.scaleSqrt()
-        .domain([0, d3.max(allData, d => d[sizeVar])])
-        .range([5, 20]);
-
-    svg.append("text")
-        .attr("x", width / 2)
-        .attr("y", height + margin.bottom - 20)
-        .attr("text-anchor", "middle")
-        .text(xVar)
-        .attr('class', 'labels');
-
-    svg.append("text")
-        .attr("transform", "rotate(-90)")
-        .attr("x", -height / 2)
-        .attr("y", -margin.left + 40)
-        .attr("text-anchor", "middle")
-        .text(yVar)
-        .attr('class', 'labels');
 }
 
-function updateVis() {
-    let currentData = allData.filter(d => d.month === targetMonth && d.state === stateVar);
+window.addEventListener('load', initWhiteHat);
 
-    svg.selectAll('.points')
-        .data(currentData, d => d.date)
-        .join(
-            function(enter) {
-                return enter
-                    .append('circle')
-                    .attr('class', 'points')
-                    .attr('cx', d => xScale(d[xVar]))
-                    .attr('cy', d => yScale(d[yVar]))
-                    .attr('r', d => sizeScale(d[sizeVar]))
-                    .style('opacity', .5)
-                    .on('mouseover', function(event, d) {
-                        d3.select(this)
-                            .style("fill", "orange")
-                            .style("opacity", 1);
+// Setup metro area selector
+function setupSelectorWhiteHat() {
+    const metroAreas = Array.from(new Set(censusData.map(d => d.metro_area)));
+    metroAreas.sort();
 
-                        d3.select('#tooltip')
-                            .style("display", 'block')
-                            .html(`<strong>Date: ${d.month}-${d.day}-${d.year}</strong><br/>${xVar}: ${d[xVar]}<br/>${yVar}: ${d[yVar]}`)
-                            .style("left", (event.pageX + 20) + "px")
-                            .style("top", (event.pageY - 28) + "px");
-                    })
-                    .on("mouseout", function() {
-                        d3.select(this)
-                            .style("opacity", 0.5);
+    // Add "All" option
+    metroAreas.unshift("All");
 
-                        d3.select('#tooltip')
-                            .style('display', 'none');
-                    })
-                    .attr('r', 0)
-                    .transition(t)
-                    .attr('r', d => sizeScale(d[sizeVar]));
-            },
-            function(update) {
-                return update
-                    .transition(t)
-                    .attr('cx', d => xScale(d[xVar]))
-                    .attr('cy', d => yScale(d[yVar]))
-                    .attr('r', d => sizeScale(d[sizeVar]));
-            },
-            function(exit) {
-                exit
-                    .transition(t)
-                    .attr('r', 0)
-                    .remove();
-            }
-        );
+    const dropdown = d3.select('#metroAreaSelector');
+    dropdown.selectAll('option')
+        .data(metroAreas)
+        .enter()
+        .append('option')
+        .text(d => d)
+        .attr('value', d => d);
+
+    dropdown.on('change', function () {
+        selectedMetroArea = this.value;
+        updateAxesWhiteHat();
+        updateVisWhiteHat();
+    });
+}
+
+// Update axes
+function updateAxesWhiteHat() {
+    whiteHatG.selectAll('.axis').remove();
+    whiteHatSvg.selectAll('.axis-label').remove();
+
+    const filtered = selectedMetroArea === 'All'
+        ? censusData
+        : censusData.filter(d => d.metro_area === selectedMetroArea);
+
+    xScaleWhiteHat = d3.scaleLinear()
+        .domain([0, d3.max(filtered, d => d.median_income)]).nice()
+        .range([0, whiteHatWidth]);
+
+    yScaleWhiteHat = d3.scaleLinear()
+        .domain([0, d3.max(filtered, d => d.median_home_value)]).nice()
+        .range([whiteHatHeight, 0]);
+
+    whiteHatG.append('g')
+        .attr('class', 'axis')
+        .attr('transform', `translate(0,${whiteHatHeight})`)
+        .call(d3.axisBottom(xScaleWhiteHat));
+
+    whiteHatG.append('g')
+        .attr('class', 'axis')
+        .call(d3.axisLeft(yScaleWhiteHat));
+
+    whiteHatSvg.append("text")
+        .attr("class", "axis-label")
+        .attr("transform", `translate(${whiteHatMargin.left + whiteHatWidth / 2}, ${whiteHatHeight + whiteHatMargin.top + 40})`)
+        .style("text-anchor", "middle")
+        .text("Median Income (dollars)");
+
+    whiteHatSvg.append("text")
+        .attr("class", "axis-label")
+        .attr("transform", `rotate(-90)`)
+        .attr("y", whiteHatMargin.left - 70)
+        .attr("x", 0 - (whiteHatHeight / 2) - whiteHatMargin.top)
+        .attr("dy", "1em")
+        .style("text-anchor", "middle")
+        .text("Median Home Value (dollars)");
+}
+
+// Update visualization
+function updateVisWhiteHat() {
+    const filtered = selectedMetroArea === 'All'
+        ? censusData
+        : censusData.filter(d => d.metro_area === selectedMetroArea);
+
+    const tooltip = d3.select("body").select(".tooltip").empty()
+        ? d3.select("body").append("div").attr("class", "tooltip")
+        : d3.select("body").select(".tooltip");
+
+    const circles = whiteHatG.selectAll("circle")
+        .data(filtered, d => d.geoid);
+
+    circles.enter()
+        .append("circle")
+        .attr("cx", d => xScaleWhiteHat(d.median_income))
+        .attr("cy", d => yScaleWhiteHat(d.median_home_value))
+        .attr("r", 0)
+        .attr("fill", d => colorScale(d.metro_area)) // Apply color based on metro area
+        .on("mouseover", function (event, d) {
+            tooltip.transition().duration(200).style("opacity", 0.9);
+            tooltip.html(`Census Tract: ${d.geoid}<br/>
+                          Income: $${d.median_income}<br/>
+                          Home Value: $${d.median_home_value}`)
+                .style("left", (event.pageX + 5) + "px")
+                .style("top", (event.pageY - 28) + "px");
+        })
+        .on("mouseout", function () {
+            tooltip.transition().duration(500).style("opacity", 0);
+        })
+        .transition()
+        .duration(1000)
+        .attr("r", 4);
+
+    circles.transition()
+        .duration(1000)
+        .attr("cx", d => xScaleWhiteHat(d.median_income))
+        .attr("cy", d => yScaleWhiteHat(d.median_home_value));
+
+    circles.exit()
+        .transition()
+        .duration(500)
+        .attr("r", 0)
+        .remove();
 }

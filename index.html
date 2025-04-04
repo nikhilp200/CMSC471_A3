@@ -1,24 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weather Visualization</title>
-    <link rel="stylesheet" href="css/styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Weather Visualization</title>
+  <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-    <div id="slider"></div>
-    <div id="daySlider"></div>
-    <div id="controls">
-        X: <select id="xVariable" class="variable"></select>
-        Y: <select id="yVariable" class="variable"></select>
-        size: <select id="sizeVariable" class="variable"></select>
-        State/Station: <select id="stateVariable" class="location"></select>
-    </div>
-    <div id="vis"></div>
-    <div id="tooltip" style="display:none; position:absolute; background-color:white; border:1px solid black; padding:5px;"></div>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="js/script.js"></script>
-    <script src="https://unpkg.com/d3-simple-slider"></script>
+  <div id="controls">
+    <label for="metroAreaSelector">Filter by Metro Area:</label>
+    <select id="metroAreaSelector"></select>
+  </div>
+
+  <div id="white-hat" class="chart">
+    <div class="title">White Hat Visualization: Median Income vs. Median Home Value</div>
+    <svg width="800" height="500"></svg>
+    <p>Write up:</p>
+  </div>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://unpkg.com/d3-simple-slider"></script>
+  <script src="js/script.js"></script>
 </body>
 </html>
