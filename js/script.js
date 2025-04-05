@@ -236,7 +236,7 @@ d3.csv("data/census_tracts.csv").then(function(data) {
      .attr("dy", "1em")
      .style("text-anchor", "middle")
      .attr("class", "axis-label")
-     .text("Population Count (Misleading Scale)");
+     .text("Population Count");
 
   g.append("g")
     .attr("class", "grid")

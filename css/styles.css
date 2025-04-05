@@ -31,3 +31,10 @@ body {
     pointer-events: none;
     transition: opacity 0.2s ease;
 }
+#report a::before {
+  content: none;
+}
+#report a {
+  background: none;
+  border: none;
+}
